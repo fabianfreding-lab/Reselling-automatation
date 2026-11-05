@@ -10,16 +10,16 @@ Personliga annonsexempel, stilprofiler, sparade plagg, bilder, databas och hemli
 
 ## Starta på din dator
 
-Python 3.12 eller senare rekommenderas. Snabbstart: på Windows dubbelklicka `start.bat`; på macOS/Linux kör `sh start.sh` i projektmappen. Skripten installerar kostnadsfria beroenden och startar appen. Alternativt kör kommandona nedan.
+Använd **Python 3.12**. Pillow 12.0.0 stöder inte Python 3.15; välj inte automatiskt den senaste Python-versionen. Snabbstart: på Windows dubbelklicka `start.bat`; på macOS/Linux kör `sh start.sh` i projektmappen. Skripten installerar kostnadsfria, färdigbyggda beroenden och startar appen. På macOS/Linux behöver kommandot `python3.12` finnas. På Windows används Python-startaren `py`. Tidigare virtuella miljöer och användardata raderas inte. Alternativt kör kommandona nedan.
 
 ```sh
 cd Reselling-automatation
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python app.py
+python3.12 -m venv .venv312
+.venv312/bin/python -m pip install --only-binary=:all: -r requirements.txt
+.venv312/bin/python app.py
 ```
 
-Öppna `http://127.0.0.1:5000` i din egen webbläsare. Windows: använd `python` i stället för `python3`, och `.venv\Scripts\python.exe` i stället för `.venv/bin/python`. Avsluta med Ctrl+C. Samma startkommando efter omstart behåller arbetet.
+Öppna `http://127.0.0.1:5000` i din egen webbläsare. Windows: använd `start.bat`. Den väljer Python 3.12 med `py -3.12`, och kan installera den versionen genom Python Install Manager. Den skapar `.venv312` i stället för att återanvända en gammal `.venv` med en inkompatibel Python-version. Avsluta med Ctrl+C. Samma startkommando efter omstart behåller arbetet.
 
 I den här molnmiljön är beroendena installerade i `/workspace/.venvs/resell`; starta från repokatalogen med `/workspace/.venvs/resell/bin/python app.py`. Molnserverns loopbackadress är inte en publik förhandsvisning eller åtkomlig på din telefon.
 
@@ -46,7 +46,7 @@ Installera Ollama från dess officiella webbplats på din egen dator. Välj en b
 ```sh
 ollama pull gemma3:4b
 # Starta Ollama enligt dess installationsanvisningar, sedan appen:
-OLLAMA_MODEL=gemma3:4b .venv/bin/python app.py
+OLLAMA_MODEL=gemma3:4b .venv312/bin/python app.py
 ```
 
 `OLLAMA_URL` är valfri (standard `http://127.0.0.1:11434`); bara loopbackservrar accepteras. Anslutningen är serversidig, har 180 s timeout och bilder lämnar appen endast till den lokala modellen när du trycker på AI-knappen. Modellen måste stödja bilder och JSON. AI-fakta och text är förslag, inte verifierade produktuppgifter. Alla påståenden ska granskas av dig.
@@ -76,10 +76,10 @@ Webbmanifest finns för att lägga till appen på hemskärmen där webbläsaren 
 ## Tester
 
 ```sh
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m pytest -q
+.venv312/bin/python -m pip install -r requirements-dev.txt
+.venv312/bin/python -m pytest -q
 # Kräver lokal Chromium; alternativ sökväg via CHROMIUM:
-.venv/bin/python tests/browser_flow.py
+.venv312/bin/python tests/browser_flow.py
 ```
 
 Browser-testet använder en separat tillfällig databas och startar/stänger sin egen server. Ingen testannons publiceras. Backendtester verifierar beständighet, osäkerhetskontroll, exportgodkännande, bildpixlar, faktisk vinst, borttagningsvarning, versionskonflikter, upprepade publiceringsbekräftelser, prisunderlag, säkerhet, dataradering och inloggning.
