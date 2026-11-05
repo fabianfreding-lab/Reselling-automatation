@@ -10,4 +10,7 @@ if [ ! -f .venv312/bin/python ]; then
 fi
 .venv312/bin/python -c 'import sys; sys.exit(sys.version_info[:2] != (3, 12))'
 .venv312/bin/python -m pip install --only-binary=:all: -r requirements.txt
+if [ "${PLAGG_START:-}" = mobile ]; then
+  exec .venv312/bin/python mobile_start.py
+fi
 exec .venv312/bin/python app.py

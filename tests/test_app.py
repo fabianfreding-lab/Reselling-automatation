@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
-    monkeypatch.setenv('RESELL_DATA',str(tmp_path));monkeypatch.delenv('RESELL_PASSWORD',raising=False);monkeypatch.delenv('OLLAMA_MODEL',raising=False)
+    monkeypatch.setenv('RESELL_DATA',str(tmp_path));monkeypatch.delenv('RESELL_PASSWORD',raising=False);monkeypatch.delenv('OLLAMA_MODEL',raising=False);monkeypatch.delenv('RESELL_PASSWORD_HASH',raising=False);monkeypatch.delenv('RESELL_LAN',raising=False)
     import app
     importlib.reload(app);app.app.config['TESTING']=True
     c=app.app.test_client();h={'X-CSRF-Token':c.get('/api/state').json['csrf']}
@@ -119,3 +119,77 @@ def test_personal_opening_uses_only_current_facts(env):
     d=post(c,h,d,'confirm',confirmed=True).json
     d=post(c,h,d,'generate').json
     assert d['ads']['plick']['description'].startswith('Säljer nu: Tröja.\n')
+
+def test_mobile_lan_login_guards_images_exports_and_sessions(env,monkeypatch):
+    app,c,h=env
+    from werkzeug.security import generate_password_hash
+    monkeypatch.setattr(app,'LAN_ONLY',True)
+    monkeypatch.setattr(app,'PASSWORD_HASH',generate_password_hash('test-only-mobile-password'))
+    lan={'REMOTE_ADDR':'192.168.1.40'}
+    host={'Host':'192.168.1.20:5000'}
+    for route in ['/api/state','/media/not-an-image.png','/api/export/all','/api/export/csv']:
+        assert c.get(route,headers=host,environ_overrides=lan).status_code==401
+    assert c.get('/login',headers={'Host':'evil.example'},environ_overrides=lan).status_code==403
+    assert c.get('/login',headers=host,environ_overrides={'REMOTE_ADDR':'8.8.8.8'}).status_code==403
+    c.get('/login',headers=host,environ_overrides=lan)
+    with c.session_transaction(base_url='http://192.168.1.20:5000') as sess:nonce=sess['login_nonce']
+    r=c.post('/login',data={'nonce':nonce,'password':'test-only-mobile-password'},headers=host,environ_overrides=lan)
+    assert r.status_code==302
+    assert c.get('/api/state',headers=host,environ_overrides=lan).status_code==200
+    # Changing the configured password invalidates an already signed-in browser.
+    monkeypatch.setattr(app,'PASSWORD_HASH',generate_password_hash('another-test-mobile-password'))
+    assert c.get('/api/state',headers=host,environ_overrides=lan).status_code==401
+
+
+def test_mobile_password_setup_persists_only_hash(tmp_path):
+    from mobile_start import password_hash
+    from werkzeug.security import check_password_hash
+    values=iter(['short','long-test-password','different-password','long-test-password','long-test-password'])
+    value=password_hash(tmp_path,read_password=lambda prompt:next(values))
+    assert check_password_hash(value,'long-test-password')
+    assert 'long-test-password' not in (tmp_path/'mobile-access.json').read_text()
+    assert password_hash(tmp_path,read_password=lambda prompt:pytest.fail('Must reuse saved hash'))==value
+    changed=password_hash(tmp_path,reset=True,read_password=lambda prompt:'replacement-test-password')
+    assert changed!=value and check_password_hash(changed,'replacement-test-password')
+
+
+def test_heic_mobile_photo_keeps_source_and_exports_viewable_png(env):
+    app,c,h=env
+    import pillow_heif
+    im=Image.new('RGB',(80,100),(31,61,91))
+    file=io.BytesIO();pillow_heif.from_pillow(im).save(file,quality=100)
+    original=file.getvalue()
+    d=ready(c,h)
+    d=c.post('/api/items/'+d['id']+'/images',headers=h,data={'revision':str(d['revision']),'role':'etikett','images':(io.BytesIO(original),'etikett.heic')}).json
+    x=d['images'][-1]
+    assert x['original'].endswith('.heic') and x['preview'].endswith('.png')
+    assert app.imagepath(x['original']).read_bytes()==original
+    assert c.get('/media/'+x['preview']).mimetype=='image/png'
+    with Image.open(io.BytesIO(original)) as decoded:
+        assert Image.open(app.imagepath(x['preview'])).getpixel((40,50))==decoded.convert('RGB').getpixel((40,50))
+    d=post(c,h,d,'image/'+x['id'],action='approve').json
+    d=post(c,h,d,'approve',confirmed=True).json
+    archive=zipfile.ZipFile(io.BytesIO(c.get('/api/items/'+d['id']+'/export').data))
+    assert any(name.startswith('vinted/bilder/02') and name.endswith('.png') for name in archive.namelist())
+    backup=zipfile.ZipFile(io.BytesIO(c.get('/api/export/all').data))
+    assert backup.read('images/'+x['original'])==original
+    assert 'images/'+x['preview'] in backup.namelist()
+
+
+def test_invalid_mobile_image_retains_draft(env):
+    _,c,h=env;d=ready(c,h)
+    r=c.post('/api/items/'+d['id']+'/images',headers=h,data={'revision':str(d['revision']),'images':(io.BytesIO(b'not an image'),'broken.heic')})
+    assert r.status_code==400
+    stored=c.get('/api/items/'+d['id']).json
+    assert stored['revision']==d['revision'] and len(stored['images'])==1
+
+
+def test_parallel_login_page_load_does_not_invalidate_form(env,monkeypatch):
+    app,c,h=env;monkeypatch.setattr(app,'PASSWORD','test-only-password')
+    c.get('/login')
+    with c.session_transaction() as sess:nonce=sess['login_nonce']
+    # Browsers may request icons or users may open another login tab before submitting.
+    assert c.get('/favicon.ico').status_code==200
+    c.get('/login')
+    assert c.post('/login',data={'nonce':nonce,'password':'test-only-password'}).status_code==302
+    assert c.get('/api/state').status_code==200

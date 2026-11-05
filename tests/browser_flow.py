@@ -9,6 +9,8 @@ root=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory() as tmp:
     env={**os.environ,'RESELL_DATA':tmp+'/data','PORT':'5019','RESELL_HOST':'127.0.0.1'}
     env.pop('RESELL_PASSWORD',None)
+    env.pop('RESELL_PASSWORD_HASH',None)
+    env.pop('RESELL_LAN',None)
     proc=subprocess.Popen([sys.executable,str(root/'app.py')],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     try:
         for _ in range(50):
@@ -42,7 +44,7 @@ with tempfile.TemporaryDirectory() as tmp:
             page.get_by_text('Fakta bekräftade',exact=True).wait_for()
             page.get_by_role('tab',name='2. Bilder').click()
             im=Image.new('RGB',(400,500),'white');ImageDraw.Draw(im).rectangle((120,80,280,420),fill='#31517f');path=tmp+'/test.png';im.save(path)
-            page.locator('#upload').set_input_files(path)
+            page.locator('#filesInput').set_input_files(path)
             page.get_by_role('button',name='Ladda upp bilder',exact=True).click()
             page.get_by_role('button',name='Byt bakgrund',exact=True).click()
             page.get_by_role('button',name='Godkänn bilden',exact=True).click()

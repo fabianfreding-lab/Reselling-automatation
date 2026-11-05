@@ -20,11 +20,17 @@ if errorlevel 1 goto wrong_venv
 echo Installerar appens kostnadsfria beroenden...
 "%PLAGG_PY%" -m pip install --only-binary=:all: -r requirements.txt
 if errorlevel 1 goto error
+if /i "%~1"=="mobile" goto start_mobile
 echo.
 echo Oppna http://127.0.0.1:5000 i webblasaren nar servern har startat.
 echo Lat detta fonster vara oppet medan du anvander appen.
 "%PLAGG_PY%" app.py
 if errorlevel 1 goto error
+goto finished
+:start_mobile
+"%PLAGG_PY%" mobile_start.py
+if errorlevel 1 goto error
+:finished
 pause
 exit /b 0
 :missing_launcher

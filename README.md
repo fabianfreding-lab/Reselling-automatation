@@ -27,10 +27,27 @@ I den här molnmiljön är beroendena installerade i `/workspace/.venvs/resell`;
 
 Öppna Kommandotolken (Windows-tangenten + R, skriv `cmd`, Enter) och kör `py install 3.12`. Vänta tills installationen är klar och starta sedan `start.bat` igen. Python Install Manager måste installera versionen, inte bara själva startaren. Startfilen begär nu installation uttryckligen och kontrollerar att den virtuella miljön faktiskt skapades. Ingen datamapp behöver raderas. Om installationskommandot misslyckas, spara felmeddelandet för felsökning.
 
+## Öppna på mobilen på samma Wi-Fi
+
+1. Uppdatera appfilerna i din **befintliga appmapp**. Behåll alltid `data/`, som innehåller plagg, bilder och stilprofil; den ingår inte i GitHub-nedladdningen. Säkerhetskopiera gärna den mappen före uppdatering. Stoppa den gamla appservern med Ctrl+C före omstart.
+2. Dubbelklicka på **start-mobil.bat** i Windows. På macOS/Linux: `sh start-mobil.sh`.
+3. Första gången väljer du ett lösenord på minst 12 tecken i terminalen och skriver det igen. Tecknen syns inte när du skriver. Endast en saltad lösenordshash sparas i `data/mobile-access.json`; lägg aldrig filen i GitHub och dela aldrig lösenordet i chatten. Om du redan har satt `RESELL_PASSWORD` används det lösenordet i stället.
+4. Starten visar en eller flera adresser, exempelvis `http://192.168.1.20:5000`. Anslut mobilen till **samma betrodda Wi-Fi** som datorn och skriv en av adresserna i Safari/Chrome. Datorn och serverfönstret behöver vara igång; de står även för Ollama-körningen.
+5. Logga in med lösenordet. Mobilen visar samma plagg, bilder och stilprofil som datorn; ingen separat kopiering behövs. Du kan även öppna samma adress på datorn.
+6. Om Windows-brandväggen frågar, tillåt Python endast på **privata nätverk**. Starten öppnar inga brandväggs- eller routerportar åt dig. Om sidan inte nås: kontrollera Wi-Fi, rätt datoradress, att datorn är vaken, att servern kör och att nätverket inte isolerar enheterna (t.ex. gästnät).
+
+Detta är **lokal åtkomst, inte internetdrift**. Mobilstarten begränsar både klientadresser och Host-adresser till lokala IP-nät/localhost, kräver lösenord även för bilder och exporter och använder HTTP. Trafiken är **okrypterad**: använd endast ett eget betrott hemnät. För delade/offentliga nät eller åtkomst hemifrån krävs en separat lösning med HTTPS eller krypterad VPN; det ingår inte i mobilstarten. Inga betalda tjänster är aktiverade.
+
+Vid glömt lösenord: stoppa servern, öppna Kommandotolken i appmappen och kör `.venv312\Scripts\python.exe mobile_start.py --reset-password`. Befintliga inloggningar blir ogiltiga när det nya lösenordet används. På macOS/Linux: `.venv312/bin/python mobile_start.py --reset-password`.
+
+På mobilen finns **Ta foto**, **Bildbibliotek** och **Välj filer** under steg 2 Bilder. Kameraknappen använder mobilens systemkamera (bakkamera efterfrågas) utan `getUserMedia`; ingen liveström eller separat kameratjänst behövs. Webbläsaren/operativsystemet bestämmer exakt vilka val som visas, så ett visst fotobibliotek eller filprogram kan inte tvingas fram. På datorn kan kameraknappen öppna en vanlig filväljare. Du kan kombinera flera bilder före uppladdning och ta bort en felvald bild. Valda filer ligger kvar när du byter steg, men du måste trycka **Ladda upp bilder** innan du stänger sidan. Bilder lämnar mobilen först vid uppladdningen och sparas på datorn.
+
+HEIC/HEIF från iPhone stöds. Originalfilen bevaras byte för byte. En PNG med samma dimensioner skapas från den avkodade bilden för webbläsarvisning och annons-export. Ingen generativ bildändring sker. Originalfilen kan laddas ned separat och ingår i fullständig backup. Äldre plagg/bilder utan en sådan förhandsvisning fungerar fortfarande. Max 16 bilder per plagg och 40 MB per uppladdning.
+
 ## Flödet för ett plagg
 
 1. Skapa ett utkast. Ange storlek, skick, kända fakta och eventuella defekter. Lämna inköpspriset tomt om det är okänt.
-2. Lägg till flera JPG/PNG/WebP-bilder (produkt, etikett, defekt). HEIC måste konverteras före uppladdning. Originalen sparas oförändrade, inklusive eventuell kamerametadata.
+2. Lägg till flera JPG/PNG/WebP-bilder (produkt, etikett, defekt). HEIC/HEIF stöds och visas/exporteras som PNG medan originalet behålls. Originalen sparas oförändrade, inklusive eventuell kamerametadata.
 3. Kontrollera fakta, antingen manuellt eller från den valfria lokala AI:n. AI-förslag överförs endast med knapptryckning, måste därefter bekräftas, och obesvarade osäkerheter blockerar bekräftelse.
 4. Välj bakgrund. Kantbaserad friläggning är en enkel bildalgoritm som fungerar på enfärgade bakgrunder, inte semantisk AI-segmentering. Dåligt resultat: ändra känslighet, måla en manuell mask, eller välj original. Varje vald bild måste godkännas. Etiketter/defekter behålls som original i gränssnittet. Välj ordning och omslag.
 5. Spara annonsexempel och redigera stilprofilen i Min stil. Regelbaserad text använder bekräftade fakta, inledning/avslutning, radindelning och emojis. Ton, fritt ordval, stilregler och exempel tolkas av lokal AI när sådan är ansluten. Ingen modellträning. Ändringar i texterna sparas; endast uttryckligen valda stilrättningar används framåt.
@@ -59,7 +76,7 @@ OLLAMA_MODEL=gemma3:4b .venv312/bin/python app.py
 
 Försök att läsa `https://www.vinted.se/terms_and_conditions` och `https://plick.se/villkor` stoppades med HTTP CONNECT 403 av miljöns nätverkspolicy. Plick-sökvägen är inte bekräftad. Det bevisar inget om plattformarnas faktiska funktioner eller regler. Inget dokumenterat, tillåtet publicerings-API har kunnat verifieras. Det finns ingen direktpublicering, automatisk borttagning, scraping, automatisk marknadsdatainsamling eller kundchatt. Inga privata API:er eller plattformslösenord används.
 
-Bildkrav är ännu inte verifierade. Därför sker ingen plattformsspecifik beskärning, skalning eller påstådd storleksanpassning: originalets dimensioner bevaras, bakgrundsbyten exporteras som PNG. Kontrollera aktuella krav före manuell uppladdning. Exporten beskriver detta och påstår aldrig att den publicerar.
+Bildstorlekskrav är ännu inte verifierade. Därför sker ingen plattformsspecifik beskärning, skalning eller påstådd storleksanpassning: originalets dimensioner bevaras, bakgrundsbyten och HEIC/HEIF-visningskopior exporteras som PNG. Kontrollera aktuella krav före manuell uppladdning. Exporten beskriver detta och påstår aldrig att den publicerar.
 
 ## Kostnader och säker drift
 
@@ -71,7 +88,7 @@ Standardbindningen är enbart `127.0.0.1`. Utan lösenord avvisas fjärrklienter
 
 Sessioner är signerade, API-skrivningar kräver CSRF-token, SQL är parametriserat, bilder valideras och filnamn genereras av servern. API:er, bilder och export kräver inloggning när lösenord är aktiverat. Loggar innehåller inte plaggfakta eller nyckelvärden. Ett enda personligt konto stöds. Ingen lösenordsåterställning eller fleranvändarhantering.
 
-Webbmanifest finns för att lägga till appen på hemskärmen där webbläsaren stöder det; appen behöver en körande server och har inget offline-läge. Mobilen behöver en säkert åtkomlig serveradress, inte datorns loopbackadress.
+Webbmanifest finns för att lägga till appen på hemskärmen där webbläsaren stöder det; installationsstöd varierar och full PWA-installation kan kräva HTTPS; appen behöver en körande server och har inget offline-läge. Mobilen använder datorns lokala Wi-Fi-adress vid mobilstart, inte datorns loopbackadress.
 
 ## Data, backup och radering
 
@@ -84,8 +101,11 @@ Webbmanifest finns för att lägga till appen på hemskärmen där webbläsaren 
 .venv312/bin/python -m pytest -q
 # Kräver lokal Chromium; alternativ sökväg via CHROMIUM:
 .venv312/bin/python tests/browser_flow.py
+.venv312/bin/python tests/browser_mobile.py
 ```
 
 Browser-testet använder en separat tillfällig databas och startar/stänger sin egen server. Ingen testannons publiceras. Backendtester verifierar beständighet, osäkerhetskontroll, exportgodkännande, bildpixlar, faktisk vinst, borttagningsvarning, versionskonflikter, upprepade publiceringsbekräftelser, prisunderlag, säkerhet, dataradering och inloggning.
 
 Stilprofiler kan exporteras och importeras separat som JSON under Min stil. Filen innehåller även dina annonsexempel och ska förvaras privat. Inledningen stöder `{plagg}`, `{färg}`, `{märke}` och `{från_märke}`, som fylls med det aktuella plaggets bekräftade fakta; dessa platshållare återanvänder aldrig exempelplaggens uppgifter.
+
+Mobiltester kontrollerar lösenord, sessionsbyte, LAN-begränsning, skyddade bilder/exporter, HEIC-avkodning, PNG-export och att originalfiler bevaras. Webbläsartestet provar alla tre filväljarna och mobil layout med Chromium. Den fysiska kameran och respektive iOS-/Android-väljare måste dessutom kontrolleras på din egen mobil.

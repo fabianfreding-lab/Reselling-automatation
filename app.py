@@ -3,6 +3,7 @@ import csv
 import hashlib
 import hmac
 import io
+import ipaddress
 import json
 import math
 import os
@@ -20,6 +21,10 @@ from urllib.request import Request, urlopen, ProxyHandler, build_opener
 
 from flask import Flask, request, jsonify, session, send_file, render_template
 from PIL import Image, ImageOps, ImageDraw, UnidentifiedImageError
+from pillow_heif import register_heif_opener
+from werkzeug.security import check_password_hash
+
+register_heif_opener()
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('RESELL_DATA', ROOT / 'data')).resolve()
@@ -36,6 +41,25 @@ app.config.update(SECRET_KEY=keypath.read_text(), MAX_CONTENT_LENGTH=40*1024*102
                   SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Strict',
                   SESSION_COOKIE_SECURE=os.environ.get('RESELL_HTTPS') == '1')
 PASSWORD = os.environ.get('RESELL_PASSWORD')
+PASSWORD_HASH = os.environ.get('RESELL_PASSWORD_HASH')
+LAN_ONLY = os.environ.get('RESELL_LAN') == '1'
+
+def has_auth():
+    return bool(PASSWORD or PASSWORD_HASH)
+
+def auth_generation():
+    return hmac.new(app.config['SECRET_KEY'].encode(), (PASSWORD or PASSWORD_HASH or '').encode(), 'sha256').hexdigest()
+
+def local_address(value):
+    if value == 'localhost': return True
+    try:
+        address = ipaddress.ip_address(value.split('%')[0])
+        if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped:
+            address = address.ipv4_mapped
+        return address.is_loopback or any(address in ipaddress.ip_network(n) for n in
+            ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', 'fc00::/7', 'fe80::/10']
+            if address.version == ipaddress.ip_network(n).version)
+    except (ValueError, AttributeError): return False
 STYLE = {'examples':'', 'tone':'Personlig och saklig', 'length':'kort', 'emoji':'', 'opening':'', 'closing':'', 'guidance':''}
 FACTS = ['brand','kind','color','material','model','details']
 
@@ -114,11 +138,15 @@ def public(d):
 @app.before_request
 def guard():
     # Without a password this server is restricted to local clients and local Host headers.
-    if not PASSWORD:
-        if request.remote_addr not in ('127.0.0.1','::1') or request.host.split(':')[0] not in ('127.0.0.1','localhost','[::1]'):
+    if LAN_ONLY:
+        hostname=urlparse('http://'+request.host).hostname
+        if not local_address(request.remote_addr) or not local_address(hostname):
+            fail('Mobilstarten tillåter bara åtkomst från ditt lokala nätverk.',403)
+    if not has_auth():
+        if request.remote_addr not in ('127.0.0.1','::1') or urlparse('http://'+request.host).hostname not in ('127.0.0.1','localhost','::1'):
             fail('Endast lokal åtkomst. Konfigurera lösenord och HTTPS före nätverkspublicering.',403)
-    if request.path.startswith('/static/') or request.path in ('/login','/manifest.webmanifest'): return
-    if PASSWORD and not session.get('authenticated'):
+    if request.path.startswith('/static/') or request.path in ('/login','/manifest.webmanifest','/favicon.ico'): return
+    if has_auth() and (not session.get('authenticated') or not hmac.compare_digest(session.get('auth_generation',''),auth_generation())):
         if request.path.startswith('/api/') or request.path.startswith('/media/'): fail('Logga in först.',401)
         from flask import redirect
         return redirect('/login')
@@ -141,19 +169,23 @@ def error(e):
     return jsonify(error='Åtgärden misslyckades. Ditt sparade utkast finns kvar. Försök igen.'),500
 @app.get('/')
 def index(): return render_template('index.html')
+@app.get('/favicon.ico')
+def favicon(): return app.send_static_file('icon.svg')
 @app.get('/manifest.webmanifest')
 def manifest(): return jsonify(name='Plaggverket',short_name='Plaggverket',start_url='/',display='standalone',background_color='#f5f3ee',theme_color='#244e43',icons=[{'src':'/static/icon.svg','sizes':'any','type':'image/svg+xml','purpose':'any'}])
 @app.route('/login',methods=['GET','POST'])
 def login():
     if request.method=='GET':
-        session['login_nonce']=secrets.token_hex(16)
+        session.setdefault('login_nonce',secrets.token_hex(16))
         return render_template('login.html',nonce=session['login_nonce'])
     if not hmac.compare_digest(request.form.get('nonce',''),session.pop('login_nonce','!')): fail('Ladda om inloggningssidan.',403)
     now=time.monotonic()
     if now-app.config.get('LAST_LOGIN_ATTEMPT',0)<2: fail('Vänta två sekunder före nästa försök.',429)
     app.config['LAST_LOGIN_ATTEMPT']=now
-    if not PASSWORD or not hmac.compare_digest(request.form.get('password',''),PASSWORD): fail('Fel lösenord.',403)
-    session.clear(); session['authenticated']=True
+    supplied=request.form.get('password','')
+    valid=hmac.compare_digest(supplied.encode(),PASSWORD.encode()) if PASSWORD else (bool(PASSWORD_HASH) and check_password_hash(PASSWORD_HASH,supplied))
+    if not valid: fail('Fel lösenord.',403)
+    session.clear(); session['authenticated']=True; session['auth_generation']=auth_generation()
     from flask import redirect
     return redirect('/')
 @app.post('/api/logout')
@@ -214,15 +246,25 @@ def upload(id):
     try:
         for f in files:
             raw=f.read()
-            with Image.open(io.BytesIO(raw)) as im:
-                if im.width*im.height>24000000: fail('Bilden är för stor. Använd högst 24 megapixlar.')
-                im.load()
-                if im.format not in ('JPEG','PNG','WEBP'): fail('Använd JPG, PNG eller WebP. Konvertera HEIC först.')
-                w,h=ImageOps.exif_transpose(im).size
-            iid=uuid.uuid4().hex
-            ext={'JPEG':'.jpg','PNG':'.png','WEBP':'.webp'}[Image.open(io.BytesIO(raw)).format]
-            name=iid+ext; imagepath(name).write_bytes(raw); created.append(name)
-            d['images'].append(dict(id=iid,original=name,edited=None,role=role,choice='original',approved=False,cover=len(d['images'])==0,width=w,height=h))
+            try:
+                with Image.open(io.BytesIO(raw)) as im:
+                    if im.width*im.height>50000000: fail('Bilden är för stor. Använd högst 50 megapixlar, eller välj lägre kameraupplösning.')
+                    fmt=im.format
+                    if fmt not in ('JPEG','PNG','WEBP','HEIF'): fail('Använd JPG, PNG, WebP eller HEIC/HEIF.')
+                    im.load()
+                    oriented=ImageOps.exif_transpose(im)
+                    w,h=oriented.size
+                    iid=uuid.uuid4().hex
+                    ext={'JPEG':'.jpg','PNG':'.png','WEBP':'.webp','HEIF':'.heic'}[fmt]
+                    name=iid+ext; imagepath(name).write_bytes(raw); created.append(name)
+                    preview=None
+                    if fmt=='HEIF':
+                        preview=iid+'-preview.png'
+                        oriented.convert('RGB').save(imagepath(preview),format='PNG')
+                        created.append(preview)
+            except (UnidentifiedImageError, OSError, Image.DecompressionBombError):
+                fail('Bilden kunde inte läsas. Prova en annan bild eller spara den som JPG.')
+            d['images'].append(dict(id=iid,original=name,preview=preview,edited=None,role=role,choice='original',approved=False,cover=len(d['images'])==0,width=w,height=h))
         invalidate(d); save(d,r)
     except Exception:
         for n in created: imagepath(n).unlink(missing_ok=True)
@@ -420,9 +462,9 @@ def export_zip(d):
             a=d['ads'][p]
             z.writestr(p+'/annons.txt',f"{a['title']}\n\n{a['description']}\n\nPris: {a['price']} kr\nStorlek: {d['size']}\nSkick: {d['condition']}\n\nFyll i kategori, märke, färg, material (endast bekräftat), frakt och aktuella obligatoriska plattformsfält manuellt. Kontrollera plattformens aktuella bildkrav.\n")
             for i,x in enumerate(d['images']):
-                n=x['edited'] if x['choice']=='edited' else x['original']
+                n=x['edited'] if x['choice']=='edited' else (x.get('preview') or x['original'])
                 z.write(imagepath(n),f'{p}/bilder/{i+1:02d}{"-omslag" if x["cover"] else ""}{Path(n).suffix}')
-        z.writestr('LAS-MIG.txt','Manuell export, ingen annons har publicerats. Ingen verifierad integration finns. Originaldimensioner bevaras; plattformarnas aktuella krav är inte verifierade. Kontrollera omslagsval i plattformen.\n')
+        z.writestr('LAS-MIG.txt','Manuell export, ingen annons har publicerats. Ingen verifierad integration finns. Originaldimensioner bevaras; plattformarnas aktuella krav är inte verifierade. Kontrollera omslagsval i plattformen. HEIC/HEIF-bilder exporteras som PNG; originalfilen finns kvar i appen och fullständig dataexport.\n')
     buf.seek(0); return buf
 @app.get('/api/items/<id>/export')
 def export(id):
@@ -485,7 +527,7 @@ def collect_images():
     with db() as c: docs=[json.loads(r[0]) for r in c.execute('SELECT doc FROM items')]
     names=set()
     for d in docs:
-        for x in d['images']: names.update(n for n in [x['original'],x['edited']] if n)
+        for x in d['images']: names.update(n for n in [x['original'],x['edited'],x.get('preview')] if n)
         names.update(x['screenshot'] for x in d['comparisons'] if x.get('screenshot'))
     for f in (DATA/'images').iterdir():
         if f.is_file() and f.name not in names: f.unlink()
@@ -520,5 +562,5 @@ def wipe():
 
 if __name__=='__main__':
     host=os.environ.get('RESELL_HOST','127.0.0.1')
-    if host not in ('127.0.0.1','localhost','::1') and not PASSWORD: raise SystemExit('RESELL_PASSWORD krävs för nätverksåtkomst. Använd HTTPS framför servern.')
+    if host not in ('127.0.0.1','localhost','::1') and not has_auth(): raise SystemExit('RESELL_PASSWORD krävs för nätverksåtkomst. Använd HTTPS framför servern.')
     app.run(host=host,port=int(os.environ.get('PORT','5000')),debug=False,threaded=True)
