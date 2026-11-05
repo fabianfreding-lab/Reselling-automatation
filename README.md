@@ -23,6 +23,10 @@ python3.12 -m venv .venv312
 
 I den här molnmiljön är beroendena installerade i `/workspace/.venvs/resell`; starta från repokatalogen med `/workspace/.venvs/resell/bin/python app.py`. Molnserverns loopbackadress är inte en publik förhandsvisning eller åtkomlig på din telefon.
 
+## Om Windows visar att Python 3.12 saknas
+
+Öppna Kommandotolken (Windows-tangenten + R, skriv `cmd`, Enter) och kör `py install 3.12`. Vänta tills installationen är klar och starta sedan `start.bat` igen. Python Install Manager måste installera versionen, inte bara själva startaren. Startfilen begär nu installation uttryckligen och kontrollerar att den virtuella miljön faktiskt skapades. Ingen datamapp behöver raderas. Om installationskommandot misslyckas, spara felmeddelandet för felsökning.
+
 ## Flödet för ett plagg
 
 1. Skapa ett utkast. Ange storlek, skick, kända fakta och eventuella defekter. Lämna inköpspriset tomt om det är okänt.
