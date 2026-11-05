@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+data/
+.env
+*.pyc
+
+# Privata exporter, databaser och lokala inställningar
+.env.*
+*.sqlite
+*.sqlite-*
+*.zip
+min-stilprofil.json
+*-stilprofil.json
