@@ -1,0 +1,9 @@
+{
+  "examples": "Morris marinblå jacka\nSäljer nu denna snygga marinblå jackan från Morris.\nTveka inte att skriva vid fler frågor!\nBilligare vid snabb affär😍\nFraktar snabbt 📦\n\nAcne Studios jeans\nSäljer nu dessa snygga jeans från Acne Studios.\nKlassisk femficksdesign.\nTveka inte att skriva vid fler frågor!\nBilligare vid snabb affär😍\nFraktar snabbt 📦\n\nPolo Ralph Lauren blå hoodie\nSäljer nu denna snygga blå zip-hoodien från Polo Ralph Lauren.\nStorlek S men passar på mig som väger runt 70 och är185cm!\nTveka inte att skriva vid fler frågor!\nBilligare vid snabb affär😍\nFraktar snabbt 📦",
+  "tone": "Personlig, avslappnad, direkt och vänlig. Lätt säljande utan överdrivet reklamspråk.",
+  "length": "kort",
+  "emoji": "",
+  "opening": "Säljer nu: {färg} {plagg}{från_märke}.",
+  "closing": "Tveka inte att skriva vid fler frågor!\nBilligare vid snabb affär😍\nFraktar snabbt 📦",
+  "guidance": "Korta titlar med märke, eventuell färg och plaggtyp. Korta beskrivningar med en inledning som börjar Säljer nu, följd av bekräftade detaljer om plagget och eventuellt passform. Ett budskap per rad. Ordval som snygg/snygga får användas sparsamt. Behåll standardavslutningen rad för rad; emojis hör till respektive rad och ska inte dubblas. Uppgifter i exemplen om märken, material, konstruktion, modell, storlek, kroppsmått, vikt, längd och passform gäller enbart det gamla plagget och får aldrig kopieras till ett nytt. Passformsråd och femficksdesign får bara skrivas om de bekräftats för det aktuella plagget. Exempelpriserna är inte prisunderlag för nya annonser. Skapa inga irrelevanta taggar. Storlek, skick och kända defekter ska framgå, även när exemplen utelämnar dem. Användaren kan ändra standardlöften om frakt och snabb affär i avslutningsfältet."
+}
