@@ -82,7 +82,7 @@ Bildstorlekskrav är ännu inte verifierade. Därför sker ingen plattformsspeci
 
 - **App:** gratis att köra lokalt. Internetdrift kan medföra hostingavgift och är inte konfigurerad.
 - **Lagring:** SQLite och bilder i `data/`, ingen molnlagring eller lagringsavgift från appen. Disk och backup är ditt ansvar.
-- **AI:** lokal Ollama har ingen API-avgift men använder egen hårdvara. Betald AI är inte implementerad/aktiverad. Befintliga AI-abonnemang antas inte täcka API.
+- **AI:** lokal Ollama har ingen API-avgift men använder egen hårdvara. Installation aktiverar ingen betald AI. Den valbara Google-anslutningen kräver separat kontroll av gratisprojekt, modell och datavillkor; appen kan inte läsa leverantörens faktureringsstatus. Befintliga AI-abonnemang antas inte täcka API.
 
 Standardbindningen är enbart `127.0.0.1`. Utan lösenord avvisas fjärrklienter och främmande Host-rubriker. För egen LAN/Internetdrift måste `RESELL_PASSWORD` sättas säkert i serverns miljö och `RESELL_HOST` konfigureras; dela inte värdet i chatten. Vid Internetdrift krävs en riktig WSGI-server bakom HTTPS-proxy och `RESELL_HTTPS=1` för Secure-cookie. Flask-utvecklingsservern ska inte internetexponeras. Den här leveransen gör ingen publik driftsättning.
 
@@ -109,3 +109,7 @@ Browser-testet använder en separat tillfällig databas och startar/stänger sin
 Stilprofiler kan exporteras och importeras separat som JSON under Min stil. Filen innehåller även dina annonsexempel och ska förvaras privat. Inledningen stöder `{plagg}`, `{färg}`, `{märke}` och `{från_märke}`, som fylls med det aktuella plaggets bekräftade fakta; dessa platshållare återanvänder aldrig exempelplaggens uppgifter.
 
 Mobiltester kontrollerar lösenord, sessionsbyte, LAN-begränsning, skyddade bilder/exporter, HEIC-avkodning, PNG-export och att originalfiler bevaras. Webbläsartestet provar alla tre filväljarna och mobil layout med Chromium. Den fysiska kameran och respektive iOS-/Android-väljare måste dessutom kontrolleras på din egen mobil.
+
+## Kostnadsfri webbdrift — förberedelser
+
+Se [deploy/GRATIS.md](deploy/GRATIS.md) för förberedelser för PythonAnywheres gratiskonto med beständig SQLite-/bildlagring, HTTPS-inloggning och en valfri, avstängd Gemini-anslutning. Det är inte en redan publicerad molnapp eller en verifierad komplett gratis AI-lösning: konto, aktuell gratiskvot och extern AI-åtkomst återstår att kontrollera. Ingen betald plan eller AI-tjänst aktiveras av installationen. Befintlig lokal Ollama fungerar som tidigare.
